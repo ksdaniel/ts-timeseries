@@ -1,1 +1,1 @@
-# My Awesome Greeter
+# Time series data type

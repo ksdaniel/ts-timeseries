@@ -1,8 +1,11 @@
 class TimeSeries {
+
+  public zeroFill  : boolean = true;
+
   constructor(
     public name: string,
-    public data: [number, number][],
-    public periodicity: 'monthly' | 'daily' | 'hourly
+    public data: [Date, number][],
+    public periodicity: "monthly" | "daily" | "hourly"
   ) {}
 
   public static fromJSON(json: any): TimeSeries {
@@ -12,11 +15,11 @@ class TimeSeries {
   public toJSON(): any {
     return {
       name: this.name,
-      data: this.data
+      data: this.data,
     };
   }
 
-  public getPeriodicity(): 'monthly' | 'daily' | 'hourly' {
+  public getPeriodicity(): "monthly" | "daily" | "hourly" {
     return this.periodicity;
   }
 
@@ -24,7 +27,7 @@ class TimeSeries {
     return this.name;
   }
 
-  public getData(): [number, number][] {
+  public getData(): [Date, number][] {
     return this.data;
   }
 
@@ -52,46 +55,70 @@ class TimeSeries {
     return Math.max(...this.getValues());
   }
 
-  public getAverageValue(): number {  
-    return this.getValues().reduce((a, b) => a + b, 0) / this.getValues().length;
+  public getAverageValue(): number {
+    return (
+      this.getValues().reduce((a, b) => a + b, 0) / this.getValues().length
+    );
   }
 
-  public getMedianValue(): number { 
+  public getMedianValue(): number {
     const values = this.getValues();
     const middle = Math.floor(values.length / 2);
     const sorted = values.sort((a, b) => a - b);
-    return values.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+    return values.length % 2
+      ? sorted[middle]
+      : (sorted[middle - 1] + sorted[middle]) / 2;
   }
 
   public fillGaps(): TimeSeries {
-    const data = this.data;
-    const periodicity = this.periodicity;
-    const filledData: any[] = [];
-    let lastDate = this.getMinDate();
-    let lastValue = this.getMinValue();
+    const dates = this.getDates();
+    const values = this.getValues();
+    const newDates: Date[] = [];
+    const newValues: number[] = [];
 
-    for (let i = 0; i < data.length; i++) {
-      const date = new Date(data[i][0]);
-      const value = data[i][1];
+    for (let i = 0; i < dates.length - 1; i++) {
+      const date = dates[i];
+      const nextDate = dates[i + 1];
+      const value = values[i];
+      const nextValue = values[i + 1];
+      const diff = this.getDiff(date, nextDate);
 
-      if (date.getTime() !== lastDate.getTime()) {
-        const diff = date.getTime() - lastDate.getTime();
-        const step = diff / (periodicity === 'monthly' ? 30 : 1);
-        for (let j = 1; j < step; j++) {
-          filledData.push([lastDate.getTime() + j * (diff / step), lastValue]);
-        }
+      newDates.push(date);
+      newValues.push(value);
+
+      for (let j = 1; j < diff; j++) {
+        newDates.push(this.add(date, j));
+        newValues.push(this.zeroFill? 0 : value + (nextValue - value) * (j / diff));
       }
-
-      filledData.push([date.getTime(), value]);
-      lastDate = date;
-      lastValue = value;
     }
 
-    return new TimeSeries(this.name, filledData, this.periodicity);
+    newDates.push(dates[dates.length - 1]);
+    newValues.push(values[values.length - 1]);
+
+    return new TimeSeries(this.name, newDates.map((d, i) => [d, newValues[i]]), this.periodicity);
+  }
+
+  private getDiff(date1: Date, date2: Date): number {
+    switch (this.periodicity) {
+      case "monthly":
+        return date2.getMonth() - date1.getMonth();
+      case "daily":
+        return Math.ceil((date2.getTime() - date1.getTime()) / 86400000);
+      case "hourly":
+        return Math.ceil((date2.getTime() - date1.getTime()) / 3600000);
+    }
+  }
+
+  private add(date: Date, diff: number): Date {
+    switch (this.periodicity) {
+      case "monthly":
+        return new Date(date.getFullYear(), date.getMonth() + diff, date.getDate());
+      case "daily":
+        return new Date(date.getTime() + diff * 86400000);
+      case "hourly":
+        return new Date(date.getTime() + diff * 3600000);
+    }
   }
 }
 
-
-const timeSeries = new TimeSeries('test', [[0, 1], [1, 2], [3, 3]], 'daily');
-
-console.log(timeSeries.fillGaps());
+export default TimeSeries;
