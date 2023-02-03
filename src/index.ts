@@ -1,13 +1,23 @@
 class TimeSeries {
-
-  public zeroFill  : boolean = true;
-
   constructor(
     public name: string,
     public data: [Date, number][],
-    public periodicity: "monthly" | "daily" | "hourly"
-  ) {}
+    public periodicity: "monthly" | "daily" | "hourly",
+    public zeroFill: boolean = true,
+    public sortOrder: "ASC" | "DESC" = "ASC"
+  ) {
+    this.sortData(sortOrder);
+  }
 
+  sortData(order: "ASC" | "DESC") {
+    this.data.sort((a: [Date, number], b: [Date, number]) => {
+      if (order === "ASC") {
+        return a[0].getTime() - b[0].getTime();
+      } else {
+        return b[0].getTime() - a[0].getTime();
+      }
+    });
+  }
   public static fromJSON(json: any): TimeSeries {
     return new TimeSeries(json.name, json.data, json.periodicity);
   }
@@ -76,26 +86,56 @@ class TimeSeries {
     const newDates: Date[] = [];
     const newValues: number[] = [];
 
-    for (let i = 0; i < dates.length - 1; i++) {
-      const date = dates[i];
-      const nextDate = dates[i + 1];
-      const value = values[i];
-      const nextValue = values[i + 1];
-      const diff = this.getDiff(date, nextDate);
+    if (this.sortOrder === "ASC") {
+      for (let i = 0; i < dates.length - 1; i++) {
+        const date = dates[i];
+        const nextDate = dates[i + 1];
+        const value = values[i];
+        const nextValue = values[i + 1];
+        const diff = this.getDiff(date, nextDate);
 
-      newDates.push(date);
-      newValues.push(value);
+        newDates.push(date);
+        newValues.push(value);
 
-      for (let j = 1; j < diff; j++) {
-        newDates.push(this.add(date, j));
-        newValues.push(this.zeroFill? 0 : value + (nextValue - value) * (j / diff));
+        for (let j = 1; j < diff; j++) {
+          newDates.push(this.add(date, j));
+          newValues.push(
+            this.zeroFill ? 0 : value + (nextValue - value) * (j / diff)
+          );
+        }
       }
+
+      newDates.push(dates[dates.length - 1]);
+      newValues.push(values[values.length - 1]);
+    } else {
+      for (let i = dates.length - 1; i > 0; i--) {
+        const date = dates[i];
+        const nextDate = dates[i - 1];
+        const value = values[i];
+        const nextValue = values[i - 1];
+        const diff = this.getDiff(date, nextDate);
+
+        newDates.push(date);
+        newValues.push(value);
+
+        for (let j = 1; j < diff; j++) {
+          newDates.push(this.add(date, j));
+          newValues.push(
+            this.zeroFill ? 0 : value + (nextValue - value) * (j / diff)
+          );
+        }
+      }
+      newDates.push(dates[0]);
+      newValues.push(values[0]);
     }
 
-    newDates.push(dates[dates.length - 1]);
-    newValues.push(values[values.length - 1]);
-
-    return new TimeSeries(this.name, newDates.map((d, i) => [d, newValues[i]]), this.periodicity);
+    return new TimeSeries(
+      this.name,
+      newDates.map((d, i) => [d, newValues[i]]),
+      this.periodicity,
+      this.zeroFill,
+      this.sortOrder
+    );
   }
 
   private getDiff(date1: Date, date2: Date): number {
@@ -112,7 +152,11 @@ class TimeSeries {
   private add(date: Date, diff: number): Date {
     switch (this.periodicity) {
       case "monthly":
-        return new Date(date.getFullYear(), date.getMonth() + diff, date.getDate());
+        return new Date(
+          date.getFullYear(),
+          date.getMonth() + diff,
+          date.getDate()
+        );
       case "daily":
         return new Date(date.getTime() + diff * 86400000);
       case "hourly":

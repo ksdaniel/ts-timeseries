@@ -1,13 +1,17 @@
-### Time series data type
+# Time series data type
+
+The reasoning behind this package is rather simple: most plotting libraries require as input two array's: one with labels, one with values. For time series, most of the times we want to see continuous time intervals, with missing data either interporlated or set to 0. Usually, backends will not provide "zero values" for the missing dates. This is the main usage scenario for this package. 
 
 Sample usage here: 
 
 ```typescript
-const _timeSeries = new TimeSeries("test", [
-  [new Date(2020, 0, 0), 1],
+const _timeSeries = new TimeSeries("test", // name of the dataset 
+  [[new Date(2020, 0, 0), 1],
   [new Date(2020, 0, 1), 2],
-  [new Date(2020, 0, 4), 3]],
-  "daily"
+  [new Date(2020, 0, 4), 3]], // the actual date / value pairs 
+  "daily", // periodicity
+  true, // true - fill with zero, false - linear interpolation
+  "ASC" // sorting of the date values (ASC or DESC)
 );
 
 console.log(_timeSeries.fillGaps());
@@ -37,10 +41,9 @@ const _timeSeries = new TimeSeries("test", [
   [new Date(2020, 0, 0), 1],
   [new Date(2020, 0, 1), 2],
   [new Date(2020, 0, 4), 3]],
-  "daily"
+  "daily", 
+  false
 );
-
-_timeSeries.zeroFill = false;
 
 console.log(_timeSeries.fillGaps());
 ```
